@@ -7,9 +7,14 @@ import pickle
 import json
 import os
 
+def load_data():
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv"
+    df = pd.read_csv(url, sep=';')
+    return df
+
 def train_model():
     print("Loading data...")
-    df = pd.read_csv('/home/nightfury653/Documents/College Studies/Sem8/MLOPS/wine+quality/winequality-red.csv')
+    df = load_data()
     
     X = df.drop('quality', axis=1)
     y = df['quality']
