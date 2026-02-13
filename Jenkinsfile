@@ -53,8 +53,8 @@ pipeline {
             steps {
                 echo 'Comparing accuracy...'
                 script {
-                    def currentAcc = CURRENT_ACCURACY.toFloat()
-                    def bestAcc = BEST_ACCURACY.toFloat()
+                    def currentAcc = CURRENT_ACCURACY.toDouble()
+                    def bestAcc = BEST_ACCURACY.toDouble()
                     
                     echo "Current Accuracy: ${currentAcc}"
                     echo "Best Accuracy: ${bestAcc}"
