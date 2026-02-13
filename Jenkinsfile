@@ -3,8 +3,6 @@ pipeline {
     
     environment {
         DOCKER_IMAGE = "2022bcd0017/2022bcd0017-jenkins:latest"
-        CURRENT_ACCURACY = ""
-        BEST_ACCURACY = credentials('best-accuracy')
         SHOULD_DEPLOY = "false"
     }
     
@@ -33,7 +31,7 @@ pipeline {
                 echo 'Training model...'
                 sh '''
                     . venv/bin/activate
-                    python scripts/train.py
+                    python train.py
                 '''
             }
         }
@@ -42,9 +40,15 @@ pipeline {
             steps {
                 echo 'Reading accuracy from metrics.json...'
                 script {
-                    def metrics = readJSON file: 'app/artifacts/metrics.json'
-                    CURRENT_ACCURACY = metrics.accuracy
-                    echo "Current Accuracy: ${CURRENT_ACCURACY}"
+                    // Read the accuracy and store in environment variable
+                    env.CURRENT_ACCURACY = sh(
+                        script: '''
+                            python3 -c "import json; print(json.load(open('app/artifacts/metrics.json'))['accuracy'])"
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "✓ Current Accuracy read: ${env.CURRENT_ACCURACY}"
                 }
             }
         }
@@ -52,33 +56,38 @@ pipeline {
         stage('Compare Accuracy') {
             steps {
                 echo 'Comparing accuracy...'
-                script {
-                    // Do the comparison in shell using bc
-                    def result = sh(
-                        script: """
-                            current=\${CURRENT_ACCURACY}
-                            best=\${BEST_ACCURACY}
-                            
-                            echo "Current Accuracy: \$current"
-                            echo "Best Accuracy: \$best"
-                            
-                            # Use bc for floating point comparison
-                            if (( \$(echo "\$current > \$best" | bc -l) )); then
-                                echo "DEPLOY"
-                            else
-                                echo "SKIP"
-                            fi
-                        """,
-                        returnStdout: true
-                    ).trim()
-                    
-                    // Check the last line of output
-                    if (result.contains("DEPLOY")) {
-                        SHOULD_DEPLOY = "true"
-                        echo "✓ New model is better! Will build and push Docker image."
-                    } else {
-                        SHOULD_DEPLOY = "false"
-                        echo "✗ New model is not better. Skipping Docker build."
+                withCredentials([string(credentialsId: 'best-accuracy', variable: 'BEST_ACCURACY')]) {
+                    script {
+                        // Use Python for comparison (more reliable)
+                        def comparisonResult = sh(
+                            script: """
+                                python3 << 'PYTHON_EOF'
+import sys
+
+current = float('${env.CURRENT_ACCURACY}')
+best = float('${BEST_ACCURACY}')
+
+print(f"Current Accuracy: {current}")
+print(f"Best Accuracy: {best}")
+
+if current > best:
+    print("DEPLOY")
+    sys.exit(0)
+else:
+    print("SKIP")
+    sys.exit(1)
+PYTHON_EOF
+                            """,
+                            returnStatus: true
+                        )
+                        
+                        if (comparisonResult == 0) {
+                            env.SHOULD_DEPLOY = "true"
+                            echo "✓ New model is better! Will build and push Docker image."
+                        } else {
+                            env.SHOULD_DEPLOY = "false"
+                            echo "✗ New model is not better. Skipping Docker build."
+                        }
                     }
                 }
             }
@@ -86,7 +95,7 @@ pipeline {
         
         stage('Build Docker Image') {
             when {
-                expression { SHOULD_DEPLOY == "true" }
+                environment name: 'SHOULD_DEPLOY', value: 'true'
             }
             steps {
                 echo 'Building Docker image...'
@@ -100,7 +109,7 @@ pipeline {
         
         stage('Push Docker Image') {
             when {
-                expression { SHOULD_DEPLOY == "true" }
+                environment name: 'SHOULD_DEPLOY', value: 'true'
             }
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
