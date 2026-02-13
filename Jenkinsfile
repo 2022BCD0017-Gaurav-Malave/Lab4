@@ -33,7 +33,7 @@ pipeline {
                 echo 'Training model...'
                 sh '''
                     . venv/bin/activate
-                    python train.py
+                    python scripts/train.py
                 '''
             }
         }
