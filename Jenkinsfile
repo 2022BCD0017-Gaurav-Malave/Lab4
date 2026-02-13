@@ -94,35 +94,38 @@ PYTHON_EOF
         }
         
         stage('Build Docker Image') {
-            when {
-                environment name: 'SHOULD_DEPLOY', value: 'true'
-            }
             steps {
-                echo 'Building Docker image...'
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                        def customImage = docker.build("${DOCKER_IMAGE}:${BUILD_NUMBER}")
+                    if (env.SHOULD_DEPLOY == "true") {
+                        echo 'Building Docker image...'
+                        docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
+                            def customImage = docker.build("${env.DOCKER_IMAGE}:${BUILD_NUMBER}")
+                            // Store image name for next stage
+                            env.DOCKER_IMAGE_FULL = "${env.DOCKER_IMAGE}:${BUILD_NUMBER}"
+                        }
+                    } else {
+                        echo 'Skipping Docker build - model accuracy did not improve'
                     }
                 }
             }
         }
-        
+
         stage('Push Docker Image') {
-            when {
-                environment name: 'SHOULD_DEPLOY', value: 'true'
-            }
             steps {
-                echo 'Pushing Docker image to Docker Hub...'
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                        def customImage = docker.image("${DOCKER_IMAGE}:${BUILD_NUMBER}")
-                        customImage.push()
-                        customImage.push('latest')
+                    if (env.SHOULD_DEPLOY == "true") {
+                        echo 'Pushing Docker image to Docker Hub...'
+                        docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
+                            def customImage = docker.image(env.DOCKER_IMAGE_FULL)
+                            customImage.push()
+                            customImage.push('latest')
+                        }
+                    } else {
+                        echo 'Skipping Docker push - model accuracy did not improve'
                     }
                 }
             }
         }
-    }
     
     post {
         always {
