@@ -126,6 +126,7 @@ PYTHON_EOF
                 }
             }
         }
+    }
     
     post {
         always {
