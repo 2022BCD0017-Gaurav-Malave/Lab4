@@ -38,18 +38,26 @@ def train_model():
     print(f"  MSE: {mse:.4f}")
     print(f"  R2 Score: {r2:.4f}")
     
-    os.makedirs('model', exist_ok=True)
-    with open('model/wine_model.pkl', 'wb') as f:
-        pickle.dump(model, f)
-    print("Model saved to model/wine_model.pkl")
+    # Create app/artifacts directory (as required by lab)
+    os.makedirs('app/artifacts', exist_ok=True)
     
+    # Save model to app/artifacts
+    with open('app/artifacts/wine_model.pkl', 'wb') as f:
+        pickle.dump(model, f)
+    print("Model saved to app/artifacts/wine_model.pkl")
+    
+    # Save metrics with 'accuracy' key (using r2_score as accuracy measure)
+    # For regression, R2 score can be used as an accuracy metric
     metrics = {
+        "accuracy": float(r2),  # Use r2_score as accuracy
         "mse": float(mse),
         "r2_score": float(r2)
     }
-    with open('model/metrics.json', 'w') as f:
+    
+    # Save to app/artifacts/metrics.json (as required by lab)
+    with open('app/artifacts/metrics.json', 'w') as f:
         json.dump(metrics, f, indent=2)
-    print("Metrics saved to model/metrics.json")
+    print("Metrics saved to app/artifacts/metrics.json")
     
     return metrics
 
