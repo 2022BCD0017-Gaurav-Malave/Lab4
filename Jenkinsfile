@@ -53,13 +53,27 @@ pipeline {
             steps {
                 echo 'Comparing accuracy...'
                 script {
-                    def currentAcc = CURRENT_ACCURACY.toDouble()
-                    def bestAcc = BEST_ACCURACY.toDouble()
+                    // Do the comparison in shell using bc
+                    def result = sh(
+                        script: """
+                            current=\${CURRENT_ACCURACY}
+                            best=\${BEST_ACCURACY}
+                            
+                            echo "Current Accuracy: \$current"
+                            echo "Best Accuracy: \$best"
+                            
+                            # Use bc for floating point comparison
+                            if (( \$(echo "\$current > \$best" | bc -l) )); then
+                                echo "DEPLOY"
+                            else
+                                echo "SKIP"
+                            fi
+                        """,
+                        returnStdout: true
+                    ).trim()
                     
-                    echo "Current Accuracy: ${currentAcc}"
-                    echo "Best Accuracy: ${bestAcc}"
-                    
-                    if (currentAcc > bestAcc) {
+                    // Check the last line of output
+                    if (result.contains("DEPLOY")) {
                         SHOULD_DEPLOY = "true"
                         echo "✓ New model is better! Will build and push Docker image."
                     } else {
